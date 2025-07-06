@@ -1,17 +1,62 @@
 #include <bits/stdc++.h>
+#include <filesystem>
 #include "huffman.h"
 #include "Node.h"
 
 using namespace std;
+namespace fs = std::filesystem;
 vector<vector<pair<char, int>>> v(300);
 
-void print(node *root, int i, vector<vector<pair<char, int>>> &v)
+void print(node *root, int i)
 {
-    if (root == NULL)
+    if (root->type == LEAF)
+    {
+        cout << root->ch << endl;
         return;
-    v[i].push_back({root->ch, root->getfreq()});
-    print(root->left, i + 1, v);
-    print(root->right, i + 1, v);
+    }
+    print(root->left, i + 1);
+    print(root->right, i + 1);
+}
+
+void buildTreeFromMap(node *&root, const map<char, pair<string, int>> &mp)
+{
+
+    for (const auto &entry : mp)
+    {
+        char ch = entry.first;
+        string bits = entry.second.first;
+
+        node *curr = root;
+
+        for (char bit : bits)
+        {
+            if (bit == '0')
+            {
+                if (!curr->left)
+                    curr->left = new node();
+                curr = curr->left;
+            }
+            else
+            {
+                if (!curr->right)
+                    curr->right = new node();
+                curr = curr->right;
+            }
+        }
+
+        curr->type = LEAF;
+        curr->ch = ch;
+    }
+}
+
+std::string bitsToString(uint32_t bits, int bit_length)
+{
+    std::string s;
+    for (int i = bit_length - 1; i >= 0; i--)
+    {
+        s += ((bits >> i) & 1) ? '1' : '0';
+    }
+    return s;
 }
 
 huffman ::huffman()
@@ -57,7 +102,8 @@ void huffman ::encode(string filename)
 
     frequencies = getFrequencies(data, size);
     buildTree();
-    showTree();
+    // showTree();
+    // print(tree,0);
 
     encodedResult = buildEncodedResult(data, size);
 
@@ -73,14 +119,33 @@ void huffman ::encode(string filename)
         s += it->second;
 
     float comp = 1 - ((float)s / (float)(size * 8));
-    cout << "\n\nAmount of bits in regular string: " << size * 8;
-    cout << "\nAmount of bits in encoded string: " << s;
-    cout << "\nCompression: " << comp * 100 << "%";
+    cout << "\nAmount of bits in regular file: " << size * 8;
+    cout << "\nAmount of bits in encoded file: " << s;
+    cout << "\nCompression: " << comp * 100 << "%"<<endl;
 }
 
 void huffman::decode(string filename, string tablename)
 {
-    readTableFile(tablename);
+
+    if (!readTableFile(tablename))
+    {
+        cout << "Failed to read table file: " << tablename << endl;
+        return;
+    }
+
+    node *root = new node();
+    buildTreeFromMap(root, *encodingMap);
+
+    tree = root;
+
+    if (!readDataFile(filename))
+    {
+        cout << "Failed to read compressed file: " << filename << endl;
+    }
+    else
+    {
+        cout << "File Decompressed" << endl;
+    }
 }
 
 char_int_m *huffman::getFrequencies(char *data, int size)
@@ -166,23 +231,6 @@ void huffman::buildTree()
 
     tree = nodes.front();
     tree->fill(*encodingMap, "", 0);
-
-    // print(tree,1,v);
-
-    // for(int i=0;i<300;i++){
-    //     char_stringintpair_m:: iterator it;
-    //     if(!v[i].empty()){
-    //         for(auto [a,b]: v[i]){
-
-    //             it=encodingMap->find(a);
-    //             if(a){
-    //                 cout<<a<< " ----->>>>"<< b<<"( "<<it->second.first<<" )"<<"    ";
-    //             }
-    //             else cout<<b<<"    ";
-    //         }
-    //         cout<<endl;
-    //     }
-    // }
 }
 
 void huffman::showTree()
@@ -195,55 +243,6 @@ void huffman::showTree()
     }
 }
 
-void huffman::createDataFile(stringintpair_v &v)
-{
-    stringintpair_v ::iterator it;
-    int size, poff, bitpos, charpos, charbitpos;
-    int bit;
-    if (datafile)
-        delete datafile;
-    datafile = new DataFile;
-    datafile->magicNumber = 0xA0;
-
-    size = 0;
-
-    for (it = v.begin(); it != v.end(); it++)
-        size += it->second;
-
-    size = (size + 8) / 8;
-
-    datafile->size = size;
-    datafile->data = new char[datafile->size];
-    datafile->paddingOffset = 8 - (size % 8);
-
-    charpos = 0;
-    charbitpos = 7;
-
-    for (it = v.begin(); it != v.end(); it++)
-    {
-
-        for (bitpos = it->second - 1; bitpos >= 0; bitpos--)
-        {
-
-            bit = (it->first[bitpos]) == '0' ? 0 : 1;
-
-            if (charbitpos < 0)
-            {
-                charbitpos = 7;
-                charpos++;
-            }
-
-            if (charbitpos == 7)
-            {
-                datafile->data[charpos] = 0x0;
-            }
-
-            datafile->data[charpos] = (datafile->data[charpos]) | bit << charbitpos;
-            charbitpos--;
-        }
-    }
-}
-
 void huffman::createTableFile(char_stringintpair_m &m)
 {
     if (tablefile)
@@ -253,7 +252,7 @@ void huffman::createTableFile(char_stringintpair_m &m)
     char_stringintpair_m::iterator it;
 
     tablefile->magicNumber = 0xA0;
-    std::cout << "Writing magic number: " << std::hex << (int)tablefile->magicNumber << std::endl;
+    // std::cout << "Writing magic number: " << std::hex << (int)tablefile->magicNumber << std::endl;
 
     for (it = encodingMap->begin(); it != encodingMap->end(); it++)
     {
@@ -261,6 +260,45 @@ void huffman::createTableFile(char_stringintpair_m &m)
         temp.size = it->second.second;
         temp.bits = std::stoi(it->second.first, nullptr, 2);
         tablefile->data.push_back(temp);
+    }
+}
+
+void huffman::createDataFile(stringintpair_v &v)
+{
+    if (datafile)
+        delete datafile;
+    datafile = new DataFile;
+    datafile->magicNumber = 0xA0;
+
+    // Calculate total bits to encode
+    int total_bits = 0;
+    for (auto &it : v)
+        total_bits += it.second;
+
+    int byte_size = (total_bits + 7) / 8;
+    datafile->size = byte_size;
+    datafile->data = new char[byte_size];
+    memset(datafile->data, 0, byte_size);
+
+    datafile->paddingOffset = (8 - (total_bits % 8)) % 8;
+
+    int bit_pos = 0; // Total bits written
+
+    for (auto &it : v)
+    {
+        const string &bits = it.first;
+        int nbits = it.second;
+        for (int i = 0; i < nbits; i++)
+        {
+            int bit = (bits[i] == '1') ? 1 : 0;
+            int byte_idx = bit_pos / 8;
+            int bit_idx = 7 - (bit_pos % 8);
+            if (bit)
+            {
+                datafile->data[byte_idx] |= (1 << bit_idx);
+            }
+            bit_pos++;
+        }
     }
 }
 
@@ -284,12 +322,6 @@ bool huffman::readTableFile(string fstr)
     }
 
     file.read(&charbuff, 1);
-    std::cout << "Read magic number: " << std::hex << (int)charbuff << std::endl;
-    // if (charbuff != 0xA0) {
-    // 		std::cout << "Invalid tablefile\n";
-    // 		file.close();
-    // 		return false;
-    // }
 
     try
     {
@@ -314,13 +346,6 @@ bool huffman::readTableFile(string fstr)
             // Append the new entry into the data vector
             tablefile->data.push_back(temp);
         }
-
-        for (auto it : tablefile->data)
-        {
-
-            cout << it.data << "--->>>";
-            cout << it.bits << "   " << it.size << endl;
-        }
     }
 
     catch (const char *err)
@@ -329,7 +354,117 @@ bool huffman::readTableFile(string fstr)
         std::cout << err << "\n";
         return false;
     }
+    encodingMap->clear();
+    for (auto Entry : tablefile->data)
+    {
+        int x = Entry.size;
+        std::string s = bitsToString(Entry.bits, x);
+        (*encodingMap)[Entry.data] = {s, Entry.size};
+    }
+
     file.close();
+    return true;
+}
+
+bool huffman::readDataFile(string filename)
+{
+    if (datafile)
+    {
+        delete datafile;
+    }
+
+    datafile = new DataFile;
+
+    ifstream dataFile(filename, ios::binary);
+    if (!dataFile)
+    {
+        cout << "Could not open data file: " << filename << endl;
+        return false;
+    }
+
+    dataFile.seekg(0, ios::end);
+    int file_size = dataFile.tellg();
+    dataFile.seekg(0, ios::beg);
+
+    unsigned char magic;
+    dataFile.read((char *)&magic, 1);
+    if (magic != 0xA0)
+    {
+        cout << "Invalid data file format." << endl;
+        dataFile.close();
+        return false;
+    }
+
+    unsigned int dataSize;
+    dataFile.read(reinterpret_cast<char *>(&dataSize), 4);
+    datafile->size = dataSize;
+
+    char paddingOffset;
+    dataFile.read(&paddingOffset, 1);
+    datafile->paddingOffset = paddingOffset;
+
+    char *compressedData = new char[dataSize];
+    dataFile.read(compressedData, dataSize);
+    datafile->data = compressedData;
+    dataFile.close();
+
+    if (!datafile || !tree)
+    {
+        cout << "Datafile or Huffman tree missing.\n";
+        return false;
+    }
+
+    string decoded = "";
+    node *current = tree;
+    int total_bits = datafile->size * 8 - datafile->paddingOffset;
+    int bit_pos = 0;
+    int symbols_decoded = 0;
+
+    while (bit_pos < total_bits)
+    {
+        int byte_idx = bit_pos / 8;
+        int bit_idx = 7 - (bit_pos % 8);
+        char current_byte = datafile->data[byte_idx];
+        int bit = (current_byte >> bit_idx) & 1;
+
+        if (bit == 0)
+        {
+            if (current->left)
+                current = current->left;
+        }
+        else
+        {
+            if (current->right)
+                current = current->right;
+        }
+
+        if (current->type == LEAF)
+        {
+            decoded += current->ch;
+            symbols_decoded++;
+            current = tree;
+        }
+        bit_pos++;
+    }
+
+    fs::path inPath(filename);
+
+    // Step 2: Extract parent directory, stem, and construct new filename
+    fs::path parentDir = inPath.parent_path(); // "uploads"
+    std::string stem = inPath.stem().string(); // "test"
+
+    fs::path outputPath = parentDir / ("decompressed_" + stem);    
+    
+    ofstream outputFile(outputPath, ios::binary);
+    if (!outputFile)
+    {
+        cout << "Could not create output file: " << outputPath << endl;
+    }
+    else
+    {
+        outputFile.write(decoded.c_str(), decoded.size());
+        outputFile.close();
+    }
     return true;
 }
 
@@ -350,7 +485,6 @@ bool huffman::writeTableFile(string fstr)
     {
 
         file.write(&tablefile->magicNumber, 1);
-        std::cout << "Writing magic number: " << std::hex << (int)tablefile->magicNumber << std::endl;
 
         for (it = tablefile->data.begin(); it != tablefile->data.end(); it++)
         {
@@ -359,6 +493,7 @@ bool huffman::writeTableFile(string fstr)
             file.write((char *)&it->bits, 4);
         }
     }
+
     file.close();
     return true;
 }
@@ -382,36 +517,7 @@ bool huffman::writeDataFile(string fstr)
         file.write(&datafile->paddingOffset, 1);
         file.write((char *)datafile->data, datafile->size);
     }
+
     file.close();
     return true;
 }
-
-// bool readDataFile(const string& filename, DataFile& datafile) {
-//     ifstream file(filename + ".htda", ios::binary);
-
-//     if (!file) {
-//         cout << "Error: Could not open file " << filename << ".htda" << endl;
-//         return false;
-//     }
-
-//     // Read magic number
-//     file.read(&datafile.magicNumber, 1);
-//     if (datafile.magicNumber != 0xA0) {
-//         cout << "Error: Invalid file format." << endl;
-//         file.close();
-//         return false;
-//     }
-
-//     // Read size of data
-//     file.read(reinterpret_cast<char*>(&datafile.size), 4);
-
-//     // Read padding offset
-//     file.read(&datafile.paddingOffset, 1);
-
-//     // Read actual compressed data
-//     datafile.data.resize(datafile.size);
-//     file.read(datafile.data.data(), datafile.size);
-
-//     file.close();
-//     return true;
-// }

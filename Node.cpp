@@ -1,6 +1,7 @@
 #include <bits/stdc++.h>
 #include "Node.h"
 
+node::node() : ch(0), freq(0), left(nullptr), right(nullptr), type(BIND) {}
 
 node :: node(char c, int f, NODE_TYPE t){
     type=t;

@@ -8,13 +8,14 @@ enum NODE_TYPE {LEAF, BIND};
 class node{
     private:
         int freq;
+        
+        public:
         NODE_TYPE type;
-    
-    public:
-
+        
         node* left;
         node *right;
         char ch;
+        node();
         node(char c, int f, NODE_TYPE t=LEAF);
         node(node* l, node* r, NODE_TYPE t=BIND);
         ~node();

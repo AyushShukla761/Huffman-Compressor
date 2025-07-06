@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Decompress File - Huffman Compressor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #e0e6ed;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Animated background dots */
+        .background-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .dot {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(255, 20, 147, 0.3);
+            border-radius: 50%;
+            animation: float 7s ease-in-out infinite;
+        }
+
+        .dot:nth-child(2n) {
+            background: rgba(138, 43, 226, 0.25);
+            animation-duration: 9s;
+            animation-delay: -2s;
+        }
+
+        .dot:nth-child(3n) {
+            background: rgba(56, 239, 125, 0.2);
+            animation-duration: 11s;
+            animation-delay: -5s;
+        }
+
+        .dot:nth-child(4n) {
+            background: rgba(17, 153, 142, 0.25);
+            animation-duration: 13s;
+            animation-delay: -7s;
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px) translateX(0px) rotate(0deg);
+                opacity: 0.3;
+            }
+            25% {
+                transform: translateY(-25px) translateX(20px) rotate(90deg);
+                opacity: 0.7;
+            }
+            50% {
+                transform: translateY(-50px) translateX(-15px) rotate(180deg);
+                opacity: 0.4;
+            }
+            75% {
+                transform: translateY(-25px) translateX(-20px) rotate(270deg);
+                opacity: 0.8;
+            }
+        }
+
+        /* Main container */
+        .container {
+            position: relative;
+            z-index: 2;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: slideInDown 1s ease-out;
+        }
+
+        .back-link {
+            display: inline-block;
+            color: #ff1493;
+            text-decoration: none;
+            margin-bottom: 2rem;
+            padding: 0.5rem 1rem;
+            border: 1px solid rgba(255, 20, 147, 0.4);
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .back-link:hover {
+            background: rgba(255, 20, 147, 0.1);
+            border-color: rgba(255, 20, 147, 0.7);
+            transform: translateY(-2px);
+        }
+
+        .title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #ff1493, #8a2be2, #38ef7d);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 4s ease-in-out infinite;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: #b0b9c8;
+            font-size: 1.1rem;
+            font-weight: 300;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+        }
+
+        /* Decompression card */
+        .decompression-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 30px;
+            padding: 3rem 2.5rem;
+            width: 100%;
+            max-width: 520px;
+            animation: slideInUp 1s ease-out 0.3s both;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        /* File upload area */
+        .file-upload-area {
+            border: 2px dashed rgba(255, 20, 147, 0.4);
+            border-radius: 20px;
+            padding: 2.5rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            background: rgba(255, 20, 147, 0.02);
+        }
+
+        .file-upload-area:hover {
+            border-color: rgba(255, 20, 147, 0.7);
+            background: rgba(255, 20, 147, 0.08);
+            transform: translateY(-2px);
+        }
+
+        .file-upload-area.dragover {
+            border-color: #ff1493;
+            background: rgba(255, 20, 147, 0.15);
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3.5rem;
+            color: #ff1493;
+            margin-bottom: 1rem;
+            display: block;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        .upload-text {
+            color: #e0e6ed;
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .upload-subtext {
+            color: #b0b9c8;
+            font-size: 0.95rem;
+        }
+
+        .file-input {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* File info */
+        .file-info {
+            background: linear-gradient(135deg, rgba(255, 20, 147, 0.1), rgba(138, 43, 226, 0.1));
+            border: 1px solid rgba(255, 20, 147, 0.3);
+            border-radius: 15px;
+            padding: 1.2rem;
+            margin-bottom: 2rem;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .file-details {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: #ff1493;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .file-size {
+            color: #b0b9c8;
+            font-size: 0.9rem;
+        }
+
+        .remove-file-btn {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #ef4444;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            margin-left: 1rem;
+        }
+
+        .remove-file-btn:hover {
+            background: rgba(239, 68, 68, 0.3);
+            transform: scale(1.1) rotate(90deg);
+        }
+
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 1.2rem 2rem;
+            border: none;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #ff1493, #8a2be2);
+            color: white;
+            border: 1px solid transparent;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(255, 20, 147, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(56, 239, 125, 0.1);
+            color: #38ef7d;
+            border: 1px solid rgba(56, 239, 125, 0.3);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(56, 239, 125, 0.2);
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(56, 239, 125, 0.3);
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Status messages */
+        .status-message {
+            padding: 1.2rem;
+            border-radius: 15px;
+            margin-bottom: 1rem;
+            text-align: center;
+            display: none;
+            font-weight: 500;
+        }
+
+        .status-success {
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            color: #22c55e;
+        }
+
+        .status-error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #ef4444;
+        }
+
+        /* Animations */
+        @keyframes slideInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .title {
+                font-size: 2rem;
+            }
+            
+            .decompression-card {
+                padding: 2rem 1.5rem;
+            }
+        }
+
+        /* Footer */
+        .footer {
+            position: absolute;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #8b9dc3;
+            font-size: 0.9rem;
+            animation: slideInUp 1s ease-out 0.6s both;
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated background -->
+    <div class="background-animation" id="backgroundAnimation"></div>
+
+    <!-- Main content -->
+    <div class="container">
+        <div class="header">
+            <a href="/" class="back-link">← Back to Home</a>
+            <h1 class="title">Decompress File</h1>
+            <p class="subtitle">Upload a .huff file to restore the original text</p>
+        </div>
+
+        <div class="decompression-card">
+            <!-- File upload area -->
+            <div class="file-upload-area" id="fileUploadArea">
+                <input type="file" class="file-input" id="fileInput" accept=".huff">
+                <span class="upload-icon">📦</span>
+                <div class="upload-text">Click to select or drag & drop</div>
+                <div class="upload-subtext">Only .huff compressed files are supported</div>
+            </div>
+
+            <!-- File info -->
+            <div class="file-info" id="fileInfo">
+                <div class="file-details">
+                    <div class="file-name" id="fileName"></div>
+                    <div class="file-size" id="fileSize"></div>
+                </div>
+                <button class="remove-file-btn" id="removeFileBtn" title="Remove file">
+                    <span>✕</span>
+                </button>
+            </div>
+
+            <!-- Status messages -->
+            <div class="status-message" id="statusMessage"></div>
+
+            <!-- Decompress button -->
+            <button class="btn btn-primary" id="decompressBtn" disabled>
+                <span id="decompressText">Select a file to decompress</span>
+            </button>
+
+            <!-- Download button -->
+            <button class="btn btn-secondary" id="downloadBtn" style="display: none;">
+                Download Restored File
+            </button>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Restoring files with Huffman Decoding</p>
+    </div>
+
+    <script>
+        // DOM elements
+        const fileUploadArea = document.getElementById('fileUploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const decompressBtn = document.getElementById('decompressBtn');
+        const decompressText = document.getElementById('decompressText');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const statusMessage = document.getElementById('statusMessage');
+        const removeFileBtn = document.getElementById('removeFileBtn');
+
+        let selectedFile = null;
+        let decompressedFileName = null;
+
+        // Create animated background dots
+        function createDots() {
+            const container = document.getElementById('backgroundAnimation');
+            const numberOfDots = 35;
+
+            for (let i = 0; i < numberOfDots; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'dot';
+                
+                dot.style.left = Math.random() * 100 + '%';
+                dot.style.top = Math.random() * 100 + '%';
+                dot.style.animationDelay = Math.random() * 10 + 's';
+                
+                const size = Math.random() * 3 + 2;
+                dot.style.width = size + 'px';
+                dot.style.height = size + 'px';
+                
+                container.appendChild(dot);
+            }
+        }
+
+        // File upload handlers
+        fileInput.addEventListener('change', handleFileSelect);
+        fileUploadArea.addEventListener('click', (event) => {
+            if (event.target !== fileInput) {
+                fileInput.click();
+            }
+        });
+        fileUploadArea.addEventListener('dragover', handleDragOver);
+        fileUploadArea.addEventListener('dragleave', handleDragLeave);
+        fileUploadArea.addEventListener('drop', handleDrop);
+        removeFileBtn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            resetFileSelection();
+            showStatus('File removed', 'success');
+        });
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file && file.name.toLowerCase().endsWith('.huff')) {
+                selectedFile = file;
+                displayFileInfo(file);
+                enableDecompressButton();
+            } else {
+                showStatus('Please select a valid .huff compressed file', 'error');
+                resetFileSelection();
+            }
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            fileUploadArea.classList.add('dragover');
+        }
+
+        function handleDragLeave(event) {
+            event.preventDefault();
+            fileUploadArea.classList.remove('dragover');
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            fileUploadArea.classList.remove('dragover');
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.name.toLowerCase().endsWith('.huff')) {
+                    selectedFile = file;
+                    fileInput.files = files;
+                    displayFileInfo(file);
+                    enableDecompressButton();
+                } else {
+                    showStatus('Please select a valid .huff compressed file', 'error');
+                }
+            }
+        }
+
+        function displayFileInfo(file) {
+            fileName.textContent = file.name;
+            fileSize.textContent = `Size: ${formatFileSize(file.size)}`;
+            fileInfo.style.display = 'flex';
+        }
+
+        function enableDecompressButton() {
+            decompressBtn.disabled = false;
+            decompressText.textContent = 'Decompress File';
+        }
+
+        function resetFileSelection() {
+            selectedFile = null;
+            fileInput.value = '';
+            fileInfo.style.display = 'none';
+            decompressBtn.disabled = true;
+            decompressText.textContent = 'Select a file to decompress';
+            downloadBtn.style.display = 'none';
+            decompressedFileName = null;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = `status-message status-${type}`;
+            statusMessage.style.display = 'block';
+            
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 5000);
+        }
+
+        // Decompress button handler
+        decompressBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            // Show loading state
+            decompressBtn.disabled = true;
+            decompressText.innerHTML = '<span class="spinner"></span>Decompressing...';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+
+                const response = await fetch('/decompress', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    decompressedFileName = result.filename || 'decompressed_file.txt';
+                    
+
+                    showStatus('File decompressed successfully!', 'success');
+                    downloadBtn.addEventListener("click", function(){
+                        window.location.href =`http://localhost:8000/download/${result.fileName}`;
+                        // document.body.removeChild(a);
+                    
+                        // showStatus('File downloaded successfully!', 'success');
+                    })
+                    downloadBtn.style.display = 'block';
+                    decompressText.textContent = 'Decompress Another File';
+                } else {
+                    const error = await response.text();
+                    showStatus(`Decompression failed: ${error}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                decompressBtn.disabled = false;
+                if (decompressText.innerHTML.includes('spinner')) {
+                    decompressText.textContent = 'Decompress File';
+                }
+            }
+        });
+
+        // Download button handler
+        // downloadBtn.addEventListener('click', async () => {
+        //     try {
+        //         const response = await fetch('/download', {
+        //             method: 'GET'
+        //         });
+
+        //         if (response.ok) {
+        //             const blob = await response.blob();
+        //             const url = window.URL.createObjectURL(blob);
+        //             const a = document.createElement('a');
+        //             a.href = url;
+        //             a.download = decompressedFileName || 'decompressed_file.txt';
+        //             document.body.appendChild(a);
+        //             a.click();
+        //             window.URL.revokeObjectURL(url);
+        //             document.body.removeChild(a);
+                    
+        //             showStatus('File downloaded successfully!', 'success');
+        //         } else {
+        //             showStatus('Download failed. Please try again.', 'error');
+        //         }
+        //     } catch (error) {
+        //         showStatus(`Download error: ${error.message}`, 'error');
+        //     }
+        // });
+
+        // Initialize dots when page loads
+        document.addEventListener('DOMContentLoaded', createDots);
+    </script>
+</body>
+</html>
